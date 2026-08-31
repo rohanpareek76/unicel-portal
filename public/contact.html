@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contact — UNICEL Rural Creditcare Foundation</title>
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+
+<header class="site-header wrap">
+  <a href="index.html" class="brand">
+    <span class="brand-mark"></span>
+    <span class="brand-name">UNICEL Rural<br><small>Creditcare Foundation</small></span>
+  </a>
+  <nav class="main-nav">
+    <a href="index.html">Home</a>
+    <a href="about.html">About</a>
+    <a href="how-we-work.html">How We Work</a>
+    <a href="contact.html" class="active">Contact</a>
+  </nav>
+  <a href="../portal/login.html" class="btn btn-outline">Staff Login</a>
+</header>
+
+<section class="tight">
+  <div class="wrap contact-grid">
+    <div>
+      <h2 style="font-size:1.9rem;">Talk to the Foundation.</h2>
+      <p style="margin-top:16px;">Whether you're applying for credit, partnering with us, or a journalist with questions about our lending policy — write in and the right person will get back to you.</p>
+      <div style="margin-top: 34px; font-size: 0.92rem; color: var(--ink-soft);">
+        <p style="margin:0 0 8px;">UNICEL Rural Creditcare Foundation<br>Office 12, Vaishali Nagar, Jaipur, Rajasthan 302021, India</p>
+        <p style="margin:0 0 8px;">Email: hello@unicelrural.org</p>
+        <p style="margin:0 0 8px;">Phone: +91 98765 43210</p>
+        <p style="margin:0;">Support: support@unicelrural.org</p>
+      </div>
+    </div>
+    <div>
+      <form id="contact-form">
+        <div class="field">
+          <label for="name">Your name</label>
+          <input id="name" type="text" required>
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" type="email" required>
+        </div>
+        <div class="field">
+          <label for="message">Message</label>
+          <textarea id="message" required></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Send message</button>
+        <p id="form-note" style="font-size:0.85rem; margin-top:12px;"></p>
+      </form>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <strong style="color:#fff;">UNICEL Rural Creditcare Foundation</strong><br>
+      Office 12, Vaishali Nagar, Jaipur, Rajasthan 302021, India
+    </div>
+    <div class="foot-links">
+      <a href="about.html">About</a>
+      <a href="how-we-work.html">How We Work</a>
+      <a href="contact.html">Contact</a>
+      <a href="../portal/login.html">Staff Login</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+document.getElementById('contact-form').addEventListener('submit', function (e) {
+  e.preventDefault();
+  // This is a static demo form. Wire it to a real endpoint (e.g. an
+  // /api/contact route, or a form service) before going live.
+  document.getElementById('form-note').textContent = "Thanks — this demo form doesn't send yet. Connect it to a backend route to go live.";
+  this.reset();
+});
+</script>
+
+</body>
+</html>

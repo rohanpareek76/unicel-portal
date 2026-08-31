@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Staff Login — UNICEL Rural Creditcare Foundation</title>
+<link rel="stylesheet" href="css/portal.css">
+</head>
+<body>
+
+<div class="login-screen">
+
+  <div class="login-visual">
+    <div class="band"></div>
+    <div class="band b2"></div>
+    <div class="band b3"></div>
+
+    <div class="brand-row">
+      <span class="brand-mark"></span>
+      <span class="brand-name">UNICEL Rural<br><small>Creditcare Foundation</small></span>
+    </div>
+
+    <div class="visual-copy">
+      <h2>Three roles. One decision chain.</h2>
+      <p>The Head of Institution verifies, the Director assesses risk, the Founder signs off on the rest. Log in to see your queue.</p>
+    </div>
+
+    <div class="visual-foot">Staff &amp; leadership portal — internal use only</div>
+  </div>
+
+  <div class="login-form-side">
+    <div class="login-card">
+      <h1>Welcome back</h1>
+      <p class="sub">Sign in with your Foundation email to view your review queue.</p>
+
+      <form id="login-form">
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" type="email" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" type="password" autocomplete="current-password" required>
+        </div>
+
+        <div id="login-error" class="login-error"></div>
+
+        <button type="submit" class="login-btn" id="login-btn">Log in</button>
+      </form>
+
+      <div class="demo-note">
+        Demo accounts (run <code>npm run seed</code> first):<br>
+        Founder — <code>founder@unicelrural.org</code> / <code>Founder@123</code><br>
+        Director — <code>director@unicelrural.org</code> / <code>Director@123</code><br>
+        HOI — <code>hoi@unicelrural.org</code> / <code>Hoi@123</code>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="js/portal.js"></script>
+<script>
+(function () {
+  // If already logged in, skip straight to the dashboard
+  if (Portal.getToken()) window.location.href = "dashboard.html";
+
+  const form = document.getElementById("login-form");
+  const btn = document.getElementById("login-btn");
+  const errorBox = document.getElementById("login-error");
+
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    errorBox.classList.remove("show");
+    btn.disabled = true;
+    btn.textContent = "Logging in…";
+
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+
+    try {
+      const data = await Portal.api("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      });
+      Portal.setSession(data.token, data.user);
+      window.location.href = "dashboard.html";
+    } catch (err) {
+      errorBox.textContent = err.message || "Could not log in. Please try again.";
+      errorBox.classList.add("show");
+      btn.disabled = false;
+      btn.textContent = "Log in";
+    }
+  });
+})();
+</script>
+
+</body>
+</html>

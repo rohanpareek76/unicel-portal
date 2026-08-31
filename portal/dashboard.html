@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — UNICEL Rural Creditcare Foundation</title>
+<link rel="stylesheet" href="css/portal.css">
+</head>
+<body>
+
+<header class="portal-header">
+  <div class="brand">
+    <span class="brand-mark"></span>
+    <span class="brand-name">UNICEL Rural Creditcare Foundation</span>
+  </div>
+  <div class="who">
+    <span class="name" id="who-name">—</span>
+    <span class="role-badge" id="who-role">—</span>
+    <button class="logout-btn" id="logout-btn">Log out</button>
+  </div>
+</header>
+
+<main class="portal-body">
+
+  <div class="cards-row" id="summary-cards" style="display:none;"></div>
+
+  <div class="panel" id="new-loan-panel" style="display:none;">
+    <div class="panel-head"><h2>Log a new application</h2></div>
+    <form class="new-loan-form" id="new-loan-form">
+      <div class="field"><label>Applicant name</label><input id="nl-name" required></div>
+      <div class="field"><label>Village</label><input id="nl-village" required></div>
+      <div class="field"><label>Purpose</label><input id="nl-purpose" required></div>
+      <div class="field"><label>Amount (₹)</label><input id="nl-amount" type="number" min="1" step="1" required></div>
+      <button type="submit" class="btn login-btn" style="grid-column: 1 / -1; width: auto; padding: 11px 22px;">Submit application</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2 id="queue-title">Your queue</h2>
+      <span id="queue-count" style="font-size:0.82rem; color: var(--ink-soft);"></span>
+    </div>
+    <div class="panel-body" id="loan-list">
+      <div class="empty-note">Loading…</div>
+    </div>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/portal.js"></script>
+<script src="js/dashboard.js"></script>
+</body>
+</html>
