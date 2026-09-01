@@ -5,14 +5,13 @@
  * sample loan applications at different stages so the portal has
  * something to show immediately.
  *
- * >>> EDIT THE NAMES, EMAILS AND PASSWORDS BELOW BEFORE GOING LIVE. <<<
+ * >>> EDIT THE NAMES, EMAILS AND PASSWORDS BELOW BEFORE GOING LIVE. <
  * These are placeholders — replace them with your organisation's real
  * leadership details, then re-run `npm run seed` once (it skips users
  * that already exist).
  */
 const bcrypt = require("bcryptjs");
 const db = require("./db");
-
 const STAFF = [
   {
     role: "founder",
@@ -35,13 +34,18 @@ const STAFF = [
     email: "hoi@unicelrural.org",
     password: "Hoi@123",
   },
+  {
+    role: "hoi",
+    name: "YAHAN NAYA NAAM DALO",
+    title: "Head of Institution",
+    email: "naya@unicelrural.org",
+    password: "Naya@123",
+  },
 ];
-
 const insertUser = db.prepare(
   `INSERT INTO users (name, email, password_hash, role, title) VALUES (?, ?, ?, ?, ?)`
 );
 const findUser = db.prepare(`SELECT id FROM users WHERE email = ?`);
-
 const ids = {};
 for (const s of STAFF) {
   const existing = findUser.get(s.email);
@@ -55,7 +59,6 @@ for (const s of STAFF) {
   ids[s.role] = info.lastInsertRowid;
   console.log(`Created ${s.role}: ${s.email} / ${s.password}`);
 }
-
 // Sample loan applications across the workflow, so every dashboard has
 // something to review the first time it loads.
 const loanCount = db.prepare(`SELECT COUNT(*) AS c FROM loan_applications`).get().c;
@@ -65,7 +68,6 @@ if (loanCount === 0) {
      (applicant_name, village, purpose, amount, status, hoi_id, hoi_remarks, hoi_decided_at, director_id, director_remarks, director_decided_at, created_by)
      VALUES (@applicant_name, @village, @purpose, @amount, @status, @hoi_id, @hoi_remarks, @hoi_decided_at, @director_id, @director_remarks, @director_decided_at, @created_by)`
   );
-
   insertLoan.run({
     applicant_name: "Sunita Devi",
     village: "Bassi",
@@ -76,7 +78,6 @@ if (loanCount === 0) {
     director_id: null, director_remarks: null, director_decided_at: null,
     created_by: ids.hoi,
   });
-
   insertLoan.run({
     applicant_name: "Mahesh Kumar",
     village: "Chaksu",
@@ -87,7 +88,6 @@ if (loanCount === 0) {
     director_id: null, director_remarks: null, director_decided_at: null,
     created_by: ids.hoi,
   });
-
   insertLoan.run({
     applicant_name: "Rekha Bai",
     village: "Sanganer",
@@ -98,8 +98,16 @@ if (loanCount === 0) {
     director_id: ids.director, director_remarks: "High value, escalating per policy.", director_decided_at: new Date().toISOString(),
     created_by: ids.hoi,
   });
-
-  console.log("Seeded 3 sample loan applications.");
+  insertLoan.run({
+    applicant_name: "YAHAN NAYA APPLICANT NAAM",
+    village: "Village Ka Naam",
+    purpose: "Loan lene ka reason",
+    amount: 100000,
+    status: "SUBMITTED",
+    hoi_id: null, hoi_remarks: null, hoi_decided_at: null,
+    director_id: null, director_remarks: null, director_decided_at: null,
+    created_by: ids.hoi,
+  });
+  console.log("Seeded 4 sample loan applications.");
 }
-
 console.log("\nDone. Log in at /portal/login.html with any of the accounts above.");
