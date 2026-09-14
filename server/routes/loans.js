@@ -2,6 +2,7 @@ const express = require("express");
 const db = require("../db");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const { STATUS, allowedActions, nextStatus, FOUNDER_ESCALATION_LIMIT } = require("../decisionRules");
+const XLSX = require("xlsx"); // NEW — run: npm install xlsx
 
 const router = express.Router();
 router.use(requireAuth);
@@ -43,6 +44,54 @@ router.get("/", (req, res) => {
   res.json({ loans: withActions, escalationLimit: FOUNDER_ESCALATION_LIMIT });
 });
 
+// GET /api/loans/export/excel  — NEW
+// Downloads an .xlsx file of everything the logged-in role can see,
+// including the approve/reject reason (remarks) from every stage.
+// IMPORTANT: this route must stay ABOVE any "/:id" style route.
+router.get("/export/excel", (req, res) => {
+  const { role, id } = req.user;
+  let rows;
+  if (role === "hoi") {
+    rows = db.prepare(
+      `SELECT * FROM loan_applications WHERE status = ? OR hoi_id = ? ORDER BY created_at DESC`
+    ).all(STATUS.SUBMITTED, id);
+  } else if (role === "director") {
+    rows = db.prepare(
+      `SELECT * FROM loan_applications WHERE status = ? OR director_id = ? ORDER BY created_at DESC`
+    ).all(STATUS.DIRECTOR_REVIEW, id);
+  } else {
+    rows = db.prepare(`SELECT * FROM loan_applications ORDER BY created_at DESC`).all();
+  }
+
+  const excelRows = rows.map((r) => ({
+    "ID": r.id,
+    "Applicant Name": r.applicant_name,
+    "Village": r.village,
+    "Purpose": r.purpose,
+    "Amount (Rs)": r.amount,
+    "Status": r.status,
+    "HOI Reason": r.hoi_remarks || "",
+    "HOI Decided At": r.hoi_decided_at || "",
+    "Director Reason": r.director_remarks || "",
+    "Director Decided At": r.director_decided_at || "",
+    "Founder Reason": r.founder_remarks || "",
+    "Founder Decided At": r.founder_decided_at || "",
+    "Created At": r.created_at,
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(excelRows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Loan Applications");
+  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+  res.setHeader("Content-Disposition", "attachment; filename=unicel-loan-applications.xlsx");
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
+  res.send(buffer);
+});
+
 // POST /api/loans
 // INPUT:  { applicant_name, village, purpose, amount }  (HOI logs new applications)
 // OUTPUT: the created loan record, status = SUBMITTED
@@ -64,11 +113,6 @@ router.post("/", requireRole("hoi"), (req, res) => {
 // PATCH /api/loans/:id/decision
 // INPUT:  { action: 'recommend' | 'approve' | 'reject' | 'escalate', remarks }
 // OUTPUT: the updated loan record with its new status
-//
-// This is where the hierarchy is enforced: allowedActions() checks the
-// caller's role against the loan's current status and amount before any
-// write happens, so a Director cannot approve a case still sitting with
-// the HOI, and cannot give final approval above the escalation limit.
 router.patch("/:id/decision", (req, res) => {
   const { role, id: userId } = req.user;
   const { action, remarks } = req.body || {};
