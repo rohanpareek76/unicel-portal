@@ -8,7 +8,7 @@ const router = express.Router();
 
 // POST /api/auth/login
 // INPUT:  { email, password }
-// OUTPUT: { token, user: { id, name, role, title } }
+// OUTPUT: { token, user: { id, name, email, role, title } }
 router.post("/login", (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) {
@@ -25,15 +25,17 @@ router.post("/login", (req, res) => {
     return res.status(401).json({ error: "Invalid email or password." });
   }
 
+  // NOTE: email added to the token payload and response below so the
+  // dashboard can display which account is logged in.
   const token = jwt.sign(
-    { id: user.id, name: user.name, role: user.role, title: user.title },
+    { id: user.id, name: user.name, email: user.email, role: user.role, title: user.title },
     JWT_SECRET,
     { expiresIn: "8h" }
   );
 
   res.json({
     token,
-    user: { id: user.id, name: user.name, role: user.role, title: user.title },
+    user: { id: user.id, name: user.name, email: user.email, role: user.role, title: user.title },
   });
 });
 
