@@ -1,115 +1,149 @@
-/**
- * Run with: npm run seed
- *
- * Creates staff accounts (Founder, Director, HOI) and a few sample loan
- * applications so the portal has something to show immediately.
- *
- * IMPORTANT: Change FOUNDER_PASSWORD below to something only you know,
- * then run `npm run seed` once. It skips users that already exist, so
- * re-running is safe.
- *
- * TO ADD MORE STAFF (up to as many as you need — e.g. 20 people):
- * just copy one of the objects inside the STAFF array below, change the
- * role/name/email/password, and run `npm run seed` again. Multiple
- * people CAN share the same role (e.g. several "hoi" accounts) — the
- * system already supports that.
- */
-const bcrypt = require("bcryptjs");
-const db = require("./db");
+const express = require("express");
+const db = require("../db");
+const { requireAuth, requireRole } = require("../middleware/auth");
+const { STATUS, allowedActions, nextStatus, FOUNDER_ESCALATION_LIMIT } = require("../decisionRules");
+const XLSX = require("xlsx"); // NEW — run: npm install xlsx
 
-const FOUNDER_PASSWORD = "Rohan@2026"; // <-- CHANGE THIS before going live, then log in and never share it
+const router = express.Router();
+router.use(requireAuth);
 
-const STAFF = [
-  {
-    role: "founder",
-    name: "Rohan Pareek",
-    title: "Founder",
-    email: "rohanpareek998@gmail.com",
-    password: FOUNDER_PASSWORD,
-  },
-  {
-    role: "director",
-    name: "Kavita Singh",
-    title: "Director",
-    email: "director@unicelrural.org",
-    password: "Director@123", // <-- replace with the real Director's email + a real password
-  },
-  {
-    role: "hoi",
-    name: "Arjun Meena",
-    title: "Head of Institution",
-    email: "hoi@unicelrural.org",
-    password: "Hoi@123", // <-- replace with the real HOI's email + a real password
-  },
-  // Add more staff here — copy the block above, e.g.:
-  // {
-  //   role: "hoi",
-  //   name: "New Staff Name",
-  //   title: "Head of Institution",
-  //   email: "newstaff@unicelrural.org",
-  //   password: "ChangeThis@123",
-  // },
-];
+function serialize(row) {
+  return {
+    ...row,
+    canActOnBySelf: null, // filled in per-request below
+  };
+}
 
-const insertUser = db.prepare(
-  `INSERT INTO users (name, email, password_hash, role, title) VALUES (?, ?, ?, ?, ?)`
-);
-const findUser = db.prepare(`SELECT id FROM users WHERE email = ?`);
-const ids = {};
-
-for (const s of STAFF) {
-  const existing = findUser.get(s.email);
-  if (existing) {
-    ids[s.role] = existing.id;
-    console.log(`Skipped (already exists): ${s.email}`);
-    continue;
+// GET /api/loans
+// OUTPUT: loans relevant to the logged-in role's queue, plus everything
+//         for the founder (full company visibility).
+router.get("/", (req, res) => {
+  const { role, id } = req.user;
+  let rows;
+  if (role === "hoi") {
+    rows = db.prepare(
+      `SELECT * FROM loan_applications
+       WHERE status = ? OR hoi_id = ?
+       ORDER BY created_at DESC`
+    ).all(STATUS.SUBMITTED, id);
+  } else if (role === "director") {
+    rows = db.prepare(
+      `SELECT * FROM loan_applications
+       WHERE status = ? OR director_id = ?
+       ORDER BY created_at DESC`
+    ).all(STATUS.DIRECTOR_REVIEW, id);
+  } else {
+    // founder — full company-wide visibility
+    rows = db.prepare(`SELECT * FROM loan_applications ORDER BY created_at DESC`).all();
   }
-  const hash = bcrypt.hashSync(s.password, 10);
-  const info = insertUser.run(s.name, s.email, hash, s.role, s.title);
-  ids[s.role] = info.lastInsertRowid;
-  console.log(`Created ${s.role}: ${s.email} / ${s.password}`);
-}
 
-// Sample loan applications across the workflow, so the dashboard has
-// something to review the first time it loads.
-const loanCount = db.prepare(`SELECT COUNT(*) AS c FROM loan_applications`).get().c;
-if (loanCount === 0) {
-  const insertLoan = db.prepare(
-    `INSERT INTO loan_applications
-     (applicant_name, village, purpose, amount, status, hoi_id, hoi_remarks, hoi_decided_at, director_id, director_remarks, director_decided_at, created_by)
-     VALUES (@applicant_name, @village, @purpose, @amount, @status, @hoi_id, @hoi_remarks, @hoi_decided_at, @director_id, @director_remarks, @director_decided_at, @created_by)`
+  const withActions = rows.map((r) => ({
+    ...r,
+    availableActions: allowedActions(role, r.status, r.amount),
+  }));
+  res.json({ loans: withActions, escalationLimit: FOUNDER_ESCALATION_LIMIT });
+});
+
+// GET /api/loans/export/excel  — NEW
+// Downloads an .xlsx file of everything the logged-in role can see,
+// including the approve/reject reason (remarks) from every stage.
+// IMPORTANT: this route must stay ABOVE any "/:id" style route.
+router.get("/export/excel", (req, res) => {
+  const { role, id } = req.user;
+  let rows;
+  if (role === "hoi") {
+    rows = db.prepare(
+      `SELECT * FROM loan_applications WHERE status = ? OR hoi_id = ? ORDER BY created_at DESC`
+    ).all(STATUS.SUBMITTED, id);
+  } else if (role === "director") {
+    rows = db.prepare(
+      `SELECT * FROM loan_applications WHERE status = ? OR director_id = ? ORDER BY created_at DESC`
+    ).all(STATUS.DIRECTOR_REVIEW, id);
+  } else {
+    rows = db.prepare(`SELECT * FROM loan_applications ORDER BY created_at DESC`).all();
+  }
+
+  const excelRows = rows.map((r) => ({
+    "ID": r.id,
+    "Applicant Name": r.applicant_name,
+    "Village": r.village,
+    "Purpose": r.purpose,
+    "Amount (Rs)": r.amount,
+    "Status": r.status,
+    "HOI Reason": r.hoi_remarks || "",
+    "HOI Decided At": r.hoi_decided_at || "",
+    "Director Reason": r.director_remarks || "",
+    "Director Decided At": r.director_decided_at || "",
+    "Founder Reason": r.founder_remarks || "",
+    "Founder Decided At": r.founder_decided_at || "",
+    "Created At": r.created_at,
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(excelRows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Loan Applications");
+  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+  res.setHeader("Content-Disposition", "attachment; filename=unicel-loan-applications.xlsx");
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   );
-  insertLoan.run({
-    applicant_name: "Sunita Devi",
-    village: "Bassi",
-    purpose: "Dairy cattle purchase",
-    amount: 60000,
-    status: "SUBMITTED",
-    hoi_id: null, hoi_remarks: null, hoi_decided_at: null,
-    director_id: null, director_remarks: null, director_decided_at: null,
-    created_by: ids.hoi,
-  });
-  insertLoan.run({
-    applicant_name: "Mahesh Kumar",
-    village: "Chaksu",
-    purpose: "Tractor implement purchase",
-    amount: 150000,
-    status: "DIRECTOR_REVIEW",
-    hoi_id: ids.hoi, hoi_remarks: "Documents verified, good repayment history.", hoi_decided_at: new Date().toISOString(),
-    director_id: null, director_remarks: null, director_decided_at: null,
-    created_by: ids.hoi,
-  });
-  insertLoan.run({
-    applicant_name: "Rekha Bai",
-    village: "Sanganer",
-    purpose: "Poly-house for vegetable farming",
-    amount: 350000,
-    status: "FOUNDER_REVIEW",
-    hoi_id: ids.hoi, hoi_remarks: "Strong local reputation, land documents in order.", hoi_decided_at: new Date().toISOString(),
-    director_id: ids.director, director_remarks: "High value, escalating per policy.", director_decided_at: new Date().toISOString(),
-    created_by: ids.hoi,
-  });
-  console.log("Seeded 3 sample loan applications.");
-}
+  res.send(buffer);
+});
 
-console.log("\nDone. Log in at /portal/login.html with any of the accounts above.");
+// POST /api/loans
+// INPUT:  { applicant_name, village, purpose, amount }  (HOI logs new applications)
+// OUTPUT: the created loan record, status = SUBMITTED
+router.post("/", requireRole("hoi"), (req, res) => {
+  const { applicant_name, village, purpose, amount } = req.body || {};
+  if (!applicant_name || !village || !purpose || !amount || Number(amount) <= 0) {
+    return res.status(400).json({ error: "All fields are required and amount must be positive." });
+  }
+
+  const info = db.prepare(
+    `INSERT INTO loan_applications (applicant_name, village, purpose, amount, status, created_by)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(applicant_name.trim(), village.trim(), purpose.trim(), Number(amount), STATUS.SUBMITTED, req.user.id);
+
+  const loan = db.prepare("SELECT * FROM loan_applications WHERE id = ?").get(info.lastInsertRowid);
+  res.status(201).json({ loan });
+});
+
+// PATCH /api/loans/:id/decision
+// INPUT:  { action: 'recommend' | 'approve' | 'reject' | 'escalate', remarks }
+// OUTPUT: the updated loan record with its new status
+router.patch("/:id/decision", (req, res) => {
+  const { role, id: userId } = req.user;
+  const { action, remarks } = req.body || {};
+  const loan = db.prepare("SELECT * FROM loan_applications WHERE id = ?").get(req.params.id);
+
+  if (!loan) return res.status(404).json({ error: "Loan application not found." });
+
+  let newStatus;
+  try {
+    newStatus = nextStatus(role, action, loan.status, loan.amount);
+  } catch (err) {
+    return res.status(403).json({ error: err.message });
+  }
+
+  const now = new Date().toISOString();
+  if (role === "hoi") {
+    db.prepare(
+      `UPDATE loan_applications SET status = ?, hoi_id = ?, hoi_remarks = ?, hoi_decided_at = ? WHERE id = ?`
+    ).run(newStatus, userId, remarks || null, now, loan.id);
+  } else if (role === "director") {
+    db.prepare(
+      `UPDATE loan_applications SET status = ?, director_id = ?, director_remarks = ?, director_decided_at = ? WHERE id = ?`
+    ).run(newStatus, userId, remarks || null, now, loan.id);
+  } else if (role === "founder") {
+    db.prepare(
+      `UPDATE loan_applications SET status = ?, founder_id = ?, founder_remarks = ?, founder_decided_at = ? WHERE id = ?`
+    ).run(newStatus, userId, remarks || null, now, loan.id);
+  }
+
+  const updated = db.prepare("SELECT * FROM loan_applications WHERE id = ?").get(loan.id);
+  res.json({ loan: updated });
+});
+
+module.exports = router;
