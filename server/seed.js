@@ -1,52 +1,62 @@
 /**
  * Run with: npm run seed
  *
- * Creates the three staff accounts (Founder, Director, HOI) and a few
- * sample loan applications at different stages so the portal has
- * something to show immediately.
+ * Creates staff accounts (Founder, Director, HOI) and a few sample loan
+ * applications so the portal has something to show immediately.
  *
- * >>> EDIT THE NAMES, EMAILS AND PASSWORDS BELOW BEFORE GOING LIVE. <
- * These are placeholders — replace them with your organisation's real
- * leadership details, then re-run `npm run seed` once (it skips users
- * that already exist).
+ * IMPORTANT: Change FOUNDER_PASSWORD below to something only you know,
+ * then run `npm run seed` once. It skips users that already exist, so
+ * re-running is safe.
+ *
+ * TO ADD MORE STAFF (up to as many as you need — e.g. 20 people):
+ * just copy one of the objects inside the STAFF array below, change the
+ * role/name/email/password, and run `npm run seed` again. Multiple
+ * people CAN share the same role (e.g. several "hoi" accounts) — the
+ * system already supports that.
  */
 const bcrypt = require("bcryptjs");
 const db = require("./db");
+
+const FOUNDER_PASSWORD = "Rohan@2026"; // <-- CHANGE THIS before going live, then log in and never share it
+
 const STAFF = [
   {
     role: "founder",
-    name: "Rajendra Sharma",
+    name: "Rohan Pareek",
     title: "Founder",
-    email: "founder@unicelrural.org",
-    password: "Founder@123",
+    email: "rohanpareek998@gmail.com",
+    password: FOUNDER_PASSWORD,
   },
   {
     role: "director",
     name: "Kavita Singh",
     title: "Director",
     email: "director@unicelrural.org",
-    password: "Director@123",
+    password: "Director@123", // <-- replace with the real Director's email + a real password
   },
   {
     role: "hoi",
     name: "Arjun Meena",
     title: "Head of Institution",
     email: "hoi@unicelrural.org",
-    password: "Hoi@123",
+    password: "Hoi@123", // <-- replace with the real HOI's email + a real password
   },
-  {
-    role: "hoi",
-    name: "YAHAN NAYA NAAM DALO",
-    title: "Head of Institution",
-    email: "naya@unicelrural.org",
-    password: "Naya@123",
-  },
+  // Add more staff here — copy the block above, e.g.:
+  // {
+  //   role: "hoi",
+  //   name: "New Staff Name",
+  //   title: "Head of Institution",
+  //   email: "newstaff@unicelrural.org",
+  //   password: "ChangeThis@123",
+  // },
 ];
+
 const insertUser = db.prepare(
   `INSERT INTO users (name, email, password_hash, role, title) VALUES (?, ?, ?, ?, ?)`
 );
 const findUser = db.prepare(`SELECT id FROM users WHERE email = ?`);
 const ids = {};
+
 for (const s of STAFF) {
   const existing = findUser.get(s.email);
   if (existing) {
@@ -59,7 +69,8 @@ for (const s of STAFF) {
   ids[s.role] = info.lastInsertRowid;
   console.log(`Created ${s.role}: ${s.email} / ${s.password}`);
 }
-// Sample loan applications across the workflow, so every dashboard has
+
+// Sample loan applications across the workflow, so the dashboard has
 // something to review the first time it loads.
 const loanCount = db.prepare(`SELECT COUNT(*) AS c FROM loan_applications`).get().c;
 if (loanCount === 0) {
@@ -98,16 +109,7 @@ if (loanCount === 0) {
     director_id: ids.director, director_remarks: "High value, escalating per policy.", director_decided_at: new Date().toISOString(),
     created_by: ids.hoi,
   });
-  insertLoan.run({
-    applicant_name: "YAHAN NAYA APPLICANT NAAM",
-    village: "Village Ka Naam",
-    purpose: "Loan lene ka reason",
-    amount: 100000,
-    status: "SUBMITTED",
-    hoi_id: null, hoi_remarks: null, hoi_decided_at: null,
-    director_id: null, director_remarks: null, director_decided_at: null,
-    created_by: ids.hoi,
-  });
-  console.log("Seeded 4 sample loan applications.");
+  console.log("Seeded 3 sample loan applications.");
 }
+
 console.log("\nDone. Log in at /portal/login.html with any of the accounts above.");
